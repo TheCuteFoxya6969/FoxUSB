@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoxUSB — Хаб конфигураторов</title>
+<style>
+:root{--bg:#dfe5ea;--panel:#f6f8f9;--ink:#14202b;--mute:#5d6b78;--line:#b9c4cd;--bar:#f2a900;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#161d24;--panel:#1f2831;--ink:#e6ecf1;--mute:#93a1ae;--line:#34424f;--bad:#ff6b61}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Bahnschrift,"DIN Alternate","Segoe UI",system-ui,sans-serif}
+main{max-width:920px;margin:0 auto;padding:32px 16px 48px}
+header{text-align:center;margin-bottom:32px}
+h1{font-size:32px;margin:0 0 8px;letter-spacing:-0.5px}
+.subtitle{color:var(--mute);font-size:16px;margin:0}
+
+/* Предупреждение WebHID */
+#warn{display:none;background:var(--panel);border:1px solid var(--bad);border-left:4px solid var(--bad);color:var(--bad);border-radius:6px;padding:12px 16px;margin-bottom:24px;font-size:14px}
+
+/* Сетка квадратных карточек */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  aspect-ratio:1 / 1; /* Квадратная плитка */
+  transition:border-color .15s,transform .15s;
+  overflow:hidden;
+}
+.card:hover{border-color:var(--ink);transform:translateY(-2px)}
+
+.card-content{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  justify-content:space-between;
+}
+
+/* Квадратный блок картинки */
+.card-preview{
+  width:100%;
+  aspect-ratio:1 / 1; /* Квадратная картинка */
+  max-height:160px; /* Ограничиваем высоту, чтобы оставить место под текст */
+  background:var(--bg);
+  border:1px solid var(--line);
+  border-radius:6px;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.card-preview img{
+  width:100%;
+  height:100%;
+  object-fit:contain; /* Сохраняет пропорции устройства внутри квадрата */
+  padding:12px;
+}
+
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.card-title{font-size:20px;font-weight:600;margin:0}
+.badge{font-size:11px;padding:2px 6px;border-radius:4px;background:var(--bg);color:var(--mute);border:1px solid var(--line);font-family:Consolas,monospace}
+.card-desc{color:var(--mute);font-size:13px;margin:0 0 12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
+.card-footer{margin-top:auto}
+
+/* Кнопки */
+a.btn{display:inline-flex;width:100%;align-items:center;justify-content:center;font:inherit;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--ink);border-radius:4px;padding:8px 14px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+a.btn.primary{background:var(--bar);color:#14202b;border-color:var(--bar)}
+a.btn.primary:hover{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+
+footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);text-align:center;color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>FoxUSB</h1>
+    <p class="subtitle">Все конфигураторы для устройств, разработанных TheCuteFox.</p>
+    <p class="subtitle">Открывайте нужный и настраивайте устройство прямо в браузере.</p>
+  </header>
+
+  <div id="warn">
+    <b>Внимание: Ваш браузер не поддерживает WebHID API.</b><br>
+    Для работы с устройствами откройте страницу в Chrome или Edge на ПК.
+  </div>
+
+  <div class="grid">
+    <!-- FoxFJ Card -->
+    <div class="card">
+      <div class="card-content">
+        <div>
+          <div class="card-preview">
+            <img src="img/foxfj_logo.png" alt="FoxFJ Joystick" loading="lazy">
+          </div>
+          <div class="card-header">
+            <h2 class="card-title">FoxFJ</h2>
+            <span class="badge">USB FlightStick</span>
+          </div>
+          <p class="card-desc">Конфигуратор и калибровка полётного контроллера. Настройка осей, мёртвых зон, калибровка АЦП и прочее.</p>
+        </div>
+        <div class="card-footer">
+          <a href="FoxFJ_Control.html" class="btn primary">Открыть настройщик</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- FoxIR Card -->
+    <div class="card">
+      <div class="card-content">
+        <div>
+          <div class="card-preview">
+            <img src="img/foxir_logo.png" alt="FoxIR Receiver" loading="lazy">
+          </div>
+          <div class="card-header">
+            <h2 class="card-title">FoxIR</h2>
+            <span class="badge">USB IR Receiver</span>
+          </div>
+          <p class="card-desc">ИК-приёмник. Привязка кнопок любых ИК-команд к клавишам клавиатуры, комбинациям и движениям мыши.</p>
+        </div>
+        <div class="card-footer">
+          <a href="pultHID.html" class="btn primary">Открыть настройщик</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Все инструменты работают полностью локально в браузере через протокол WebHID.</p>
+  </footer>
+</main>
+
+<script>
+if (!('hid' in navigator)) {
+  document.getElementById('warn').style.display = 'block';
+}
+</script>
+</body>
+</html>

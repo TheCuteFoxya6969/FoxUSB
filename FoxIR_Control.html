@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoxIR — настройщик</title>
+<style>
+:root{--bg:#dfe5ea;--panel:#f6f8f9;--ink:#14202b;--mute:#5d6b78;--line:#b9c4cd;--bar:#f2a900;--ok:#1f7a4d;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#161d24;--panel:#1f2831;--ink:#e6ecf1;--mute:#93a1ae;--line:#34424f;--ok:#4cc38a;--bad:#ff6b61}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Bahnschrift,"DIN Alternate","Segoe UI",system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 110px}
+main.shake{animation:shake .45s}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-bottom:14px}
+h1{font-size:28px;margin:0}
+h2{font-size:17px;margin:0 0 12px}
+p{margin:0}
+.mute{color:var(--mute)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:14px}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--ink);border-radius:4px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:var(--ink);color:var(--panel)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+button.primary{background:var(--bar);color:#14202b;font-weight:600}
+button.primary:hover:not(:disabled){background:var(--ink);color:var(--panel)}
+button.danger{border-color:var(--bad);color:var(--bad)}
+button.danger:hover:not(:disabled){background:var(--bad);color:#fff}
+button.ghost{border-color:var(--line)}
+#status{color:var(--mute)}#status.on{color:var(--ok)}
+nav{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--line);margin-bottom:14px}
+nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;margin-bottom:-2px;padding:8px 14px}
+nav button:hover:not(:disabled){background:none;color:var(--ink);border-bottom-color:var(--line)}
+nav button[aria-selected=true]{border-bottom-color:var(--bar);font-weight:600}
+[hidden]{display:none!important}
+#warn{border:1px solid var(--bad);color:var(--bad);border-radius:6px;padding:12px;margin-bottom:14px}
+
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.row:first-of-type{margin-top:0}
+.lab{min-width:190px}
+.num{font-variant-numeric:tabular-nums;text-align:right;font-size:13px;color:var(--mute)}
+.msg{min-height:1.4em;color:var(--mute);margin:8px 0 0}
+label.chk{display:inline-flex;gap:8px;align-items:center}
+input[type=range]{width:min(300px,100%);accent-color:var(--bar)}
+input[type=color]{width:56px;height:34px;padding:2px;border:1px solid var(--ink);border-radius:4px;background:var(--panel)}
+input[type=text]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+input[type=text]:focus{border-color:var(--ink)}
+.sw{width:34px;height:34px;border-radius:50%;border:1px solid var(--ink)}
+
+/* приветствие */
+.hero{text-align:center;padding:30px 16px}
+.hero h2{font-size:24px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:20px 0;text-align:left}
+.step{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px}
+.step b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--bar);color:#14202b;margin-bottom:4px}
+
+/* список привязок */
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.head h2{margin:0}
+.list{display:grid;gap:8px}
+.bind{display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.code{font-family:Consolas,monospace;font-size:14px;border-right:3px solid var(--bar);padding-left:2px}
+.code small{display:block;color:var(--mute);font-family:inherit;font-size:11px}
+.act b{display:block;overflow-wrap:anywhere}
+.act .sub{color:var(--mute);font-size:13px}
+.empty{text-align:center;padding:26px 10px;color:var(--mute)}
+.bind .btns{display:flex;gap:6px}
+.bind .btns button{padding:5px 10px;font-size:13px}
+
+/* окна */
+.overlay{position:fixed;inset:0;background:rgba(10,16,22,.65);display:grid;place-items:center;padding:14px;z-index:10;overflow:auto}
+.modal{width:min(640px,100%);background:var(--panel);border:1px solid var(--ink);border-radius:6px;padding:20px}
+.modal.wide{width:min(1080px,100%)}
+.modal.small{width:min(480px,100%)}
+.prog{display:flex;gap:6px;margin-bottom:14px}
+.prog i{flex:1;height:4px;background:var(--line)}
+.prog i.on{background:var(--bar)}
+.wait{display:grid;place-items:center;padding:18px 0}
+.radar{position:relative;width:110px;height:110px;display:grid;place-items:center;font-weight:700;color:var(--mute)}
+.radar::before,.radar::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--bar);animation:ping 2s infinite;opacity:0}
+.radar::after{animation-delay:1s}
+@keyframes ping{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.2);opacity:0}}
+.got{font-family:Consolas,monospace;font-size:22px;color:var(--ok);text-align:center;padding:8px}
+.warnbox{background:var(--bg);border:1px solid var(--bar);border-left-width:4px;border-radius:4px;padding:8px 12px;margin-top:10px;font-size:14px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0}
+.opt{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px 8px;text-align:center;cursor:pointer;user-select:none}
+.opt:hover{border-color:var(--ink)}
+.opt[aria-pressed=true]{background:var(--bar);border-color:var(--ink);color:#14202b;font-weight:600}
+.foot{display:flex;justify-content:space-between;gap:10px;margin-top:18px;flex-wrap:wrap}
+.foot .r{display:flex;gap:8px;flex-wrap:wrap}
+.hint{font-size:13px;color:var(--mute);margin-top:6px}
+.sl{display:flex;align-items:center;gap:12px;margin-top:10px}
+.sl .num{min-width:40px}
+.selbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+.selbar b{font-size:18px}
+
+/* экранная клавиатура */
+.kb{position:relative;width:100%;height:calc(var(--u,40px)*6.5);margin:10px 0;user-select:none}
+.key{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;min-width:0;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:calc(var(--u,40px)*.1);
+  font-size:calc(var(--u,40px)*.3);line-height:1.05}
+.key small{font-size:.62em;color:var(--mute);line-height:1}
+.key.mod{background:var(--panel)}
+.key:hover:not(:disabled){background:var(--line);color:var(--ink);border-color:var(--ink)}
+.key.sel,.key.lit,.key.sel:hover{background:var(--bar);color:#14202b;border-color:var(--ink);font-weight:600}
+.key.sel small,.key.lit small{color:#4a3500}
+
+/* экранная мышь */
+.mousewrap{display:flex;gap:40px;align-items:center;justify-content:center;flex-wrap:wrap;margin:14px 0 4px}
+.mouse{display:grid;grid-template-columns:1fr 44px 1fr;grid-template-rows:96px 1fr;width:180px;height:240px;border:2px solid var(--line);border-radius:90px 90px 80px 80px;overflow:hidden;background:var(--bg)}
+.mouse .body{grid-column:1/4}
+.mid{display:grid;grid-template-rows:1fr 1fr 1fr}
+.mb{display:grid;place-items:center;border:1px solid var(--line);border-radius:0;background:var(--bg);color:var(--mute);font-size:13px;padding:0;min-width:0;min-height:0}
+.mid .mb{border-left:0;border-right:0}
+.pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:6px}
+.pad .mb{border-radius:4px;font-size:20px}
+.pad .ctr{display:grid;place-items:center;color:var(--line);font-size:20px}
+.mb:hover:not(:disabled){background:var(--line);color:var(--ink)}
+.mb.sel,.mb.lit,.mb.sel:hover{background:var(--bar);color:#14202b;border-color:var(--ink);font-weight:600}
+.mousewrap.passive .mb{pointer-events:none}
+.lbl{text-align:center;color:var(--mute);font-size:13px;margin-top:6px}
+
+/* проверка */
+.info{display:flex;align-items:center;gap:12px;min-height:48px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-size:17px}
+.info.on{border-color:var(--ink);border-left:4px solid var(--bar)}
+.badbox{margin-top:14px;background:var(--bg);border:1px solid var(--bad);border-left-width:4px;border-radius:6px;padding:12px 16px;color:var(--bad);font-size:17px}
+.badbox b{font-family:Consolas,monospace}
+
+/* несохранённые изменения */
+#dirty{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--panel);border-top:3px solid var(--bar);padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
+#dirty span{font-weight:600}
+
+#toast{position:fixed;left:50%;bottom:78px;transform:translate(-50%,20px);opacity:0;background:var(--panel);border:1px solid var(--ink);padding:9px 16px;border-radius:4px;transition:.2s;z-index:20;pointer-events:none}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.bad{border-color:var(--bad);color:var(--bad)}#toast.ok{border-color:var(--ok)}
+
+@media (max-width:620px){.bind{grid-template-columns:1fr auto}.bind .code{grid-column:1/-1;border-right:0;border-bottom:3px solid var(--bar)}}
+</style>
+</head>
+<body>
+<main id="main">
+<header>
+  <div><h1>FoxIR</h1><div id="status">Не подключено</div></div>
+  <button id="connect" hidden>Переподключить</button>
+</header>
+<div id="warn" hidden>Этот браузер не поддерживает WebHID. Откройте страницу в Chrome или Edge на компьютере.</div>
+
+<section class="hero" id="welcome">
+  <h2>Подключите устройство</h2>
+  <p class="mute">Здесь вы научите любой ИК-пульт нажимать клавиши и двигать мышь.</p>
+  <div class="steps">
+    <div class="step"><b>1</b><div>Вставьте устройство в USB-порт компьютера</div></div>
+    <div class="step"><b>2</b><div>Нажмите кнопку «Подключить устройство»</div></div>
+    <div class="step"><b>3</b><div>Выберите FoxIR в окошке и нажмите «Подключить»</div></div>
+  </div>
+  <button id="connectBig" class="primary" style="padding:12px 26px;font-size:17px">Подключить устройство</button>
+</section>
+
+<div id="app" hidden>
+<nav role="tablist" id="nav">
+  <button role="tab" data-tab="t-list" aria-selected="true">Кнопки</button>
+  <button role="tab" data-tab="t-test" aria-selected="false">Проверка</button>
+  <button role="tab" data-tab="t-led" aria-selected="false">Подсветка</button>
+  <button role="tab" data-tab="t-svc" aria-selected="false">Сервис</button>
+</nav>
+
+<div class="tab" id="t-list">
+  <section>
+    <div class="head">
+      <div><h2>Назначенные кнопки</h2><div class="mute" id="cnt" style="font-size:14px">Загружаю…</div></div>
+      <button id="add" class="primary">Добавить кнопку</button>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+</div>
+
+<div class="tab" id="t-test" hidden>
+  <section>
+    <h2>Проверка кнопок</h2>
+    <p class="mute" style="margin-bottom:12px">Нажимайте кнопки на пульте — привязанные клавиши и движения мыши подсвечиваются.></p>
+    <div class="info" id="testInfo">Жду нажатие на пульте…</div>
+    <div id="kbTest"></div>
+    <div id="mouseTest"></div>
+    <div class="badbox" id="testBad" hidden></div>
+  </section>
+</div>
+
+<div class="tab" id="t-led" hidden>
+  <section>
+    <h2>Подсветка</h2>
+    <p class="mute" style="margin-bottom:10px">Светодиод на плате показывает, что делает устройство. Изменения видны сразу; чтобы они остались после отключения, сохраните их.</p>
+    <div class="row"><span class="lab">Цвет в работе</span><input type="color" id="wC"><input type="range" id="wB" min="0" max="100"><span class="num" id="wBV"></span><div class="sw" id="oW"></div></div>
+    <div class="row"><span class="lab">Цвет обучения и проверки</span><input type="color" id="cC"><input type="range" id="cB" min="0" max="100"><span class="num" id="cBV"></span><div class="sw" id="oC"></div></div>
+    <div class="row"><span class="lab">Цвет приёма сигнала</span><input type="color" id="iC"><input type="range" id="iB" min="0" max="100"><span class="num" id="iBV"></span><div class="sw" id="oI"></div></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="iFlashEn"> Мигать при каждом нажатии на пульте</label></div>
+    <div class="row"><span class="lab">Общая яркость</span><input type="range" id="gB" min="0" max="100"><span class="num" id="gBV"></span></div>
+  </section>
+</div>
+
+<div class="tab" id="t-svc" hidden>
+  <section>
+    <h2>Сервис</h2>
+    <div class="row">
+      <button id="bClear" class="danger">Удалить все кнопки</button>
+      <button id="boot" class="danger">Перезагрузить в режим прошивки</button>
+    </div>
+  </section>
+</div>
+</div>
+</main>
+
+<div id="dirty" hidden>
+  <span>Есть несохранённые изменения: они уже работают, но пропадут при отключении устройства.</span>
+  <button id="dSaveBar" class="primary">Сохранить в память</button>
+  <button id="dDiscardBar">Отменить изменения</button>
+</div>
+
+<!-- Мастер добавления -->
+<div class="overlay" id="wiz" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Добавление кнопки">
+    <div class="prog"><i id="p1"></i><i id="p2"></i><i id="p3"></i></div>
+
+    <div id="s1">
+      <h2>Шаг 1. Нажмите кнопку на пульте</h2>
+      <p class="mute">Направьте пульт на устройство и нажмите кнопку, которую хотите настроить.</p>
+      <div class="wait" id="waitBox"><div class="radar">ИК</div></div>
+      <div id="gotBox" hidden>
+        <div class="got">Кнопка найдена: <span id="irCode"></span></div>
+        <div class="warnbox" id="exist" hidden></div>
+      </div>
+      <div class="foot"><button class="ghost" data-close>Отмена</button><button id="n1" class="primary" disabled>Дальше</button></div>
+    </div>
+
+    <div id="s2" hidden>
+      <h2>Шаг 2. Что должна делать эта кнопка?</h2>
+      <div class="opts" id="typeOpts">
+        <div class="opt" role="button" tabindex="0" aria-pressed="true" data-type="0">Нажимать клавишу</div>
+        <div class="opt" role="button" tabindex="0" aria-pressed="false" data-type="1">Управлять мышью</div>
+      </div>
+
+      <div id="kbPane">
+        <div class="selbar"><span>Выбрано:</span><b id="kbSel">—</b><button class="ghost" id="kbReset" style="margin-left:auto;padding:4px 10px">Сбросить</button></div>
+        <div id="kbWiz"></div>
+        <div class="hint">Нажмите на экранную клавишу. Для сочетания (например, <b>Alt + F4</b>) сначала нажмите Alt, затем F4. Нажатие на обычной клавиатуре тоже выбирает клавишу.</div>
+      </div>
+
+      <div id="mPane" hidden>
+        <div class="selbar"><span>Выбрано:</span><b id="mSel">—</b></div>
+        <div id="mouseWiz"></div>
+        <div class="sl" id="stepRow" hidden><span>Скорость</span><input type="range" id="mStep" min="1" max="100" value="15"><span class="num" id="mStepV">15</span></div>
+      </div>
+      <div class="foot"><button id="b2" class="ghost">Назад</button><button id="n2" class="primary" disabled>Дальше</button></div>
+    </div>
+
+    <div id="s3" hidden>
+      <h2>Шаг 3. Назовите кнопку и примените</h2>
+      <div class="bind" style="margin-top:12px;grid-template-columns:150px 1fr"><div class="code" id="sumCode"></div><div class="act" id="sumAct"></div></div>
+      <label for="nameIn" style="display:block;margin:14px 0 6px">Название (необязательно) — как называется эта кнопка на пульте:</label>
+      <input type="text" id="nameIn" placeholder="Например: Громкость +">
+      <div class="hint">До 11 русских букв. Кнопка начнёт работать сразу, а в память устройства запишется, когда вы нажмёте «Сохранить в память».</div>
+      <div class="foot"><button id="b3" class="ghost">Назад</button><div class="r"><button id="saveMore">Применить и добавить ещё</button><button id="save" class="primary">Применить</button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Предупреждение о несохранённом -->
+<div class="overlay" id="dlg" hidden>
+  <div class="modal small" role="alertdialog" aria-modal="true" aria-label="Несохранённые изменения">
+    <h2>Вы забыли сохранить!</h2>
+    <p>Изменения работают на устройстве, но ещё не записаны в его память. Сохранить их?</p>
+    <div class="foot">
+      <button id="dStay" class="ghost">Остаться</button>
+      <div class="r"><button id="dForget" class="danger">Забыть изменения</button><button id="dSave" class="primary">Сохранить</button></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const hasHid='hid' in navigator;
+let dev=null, maxB=60, bindings=[], curTab='t-list', dirty=false, pendingTab=null;
+let wiz={ir:0,type:0,key:0,mod:0,mact:'click_left',step:15,name:''};
+
+/* ================= Справочник клавиш и раскладка ================= */
+const MODN={1:'Ctrl',2:'Shift',4:'Alt',8:'Win',0x10:'Ctrl (прав.)',0x20:'Shift (прав.)',0x40:'Alt (прав.)',0x80:'Win (прав.)'};
+const KEYS={}, CODE2HID={}, LAYOUT=[];
+function K(x,y,label,o={}){
+  const k={x,y,w:1,h:1,label,...o};LAYOUT.push(k);
+  if(k.code)KEYS[k.code]=k.name||label;
+}
+(function(){
+  const F=i=>i<=4?2+(i-1):i<=8?6.5+(i-5):11+(i-9);
+  K(0,0,'Esc',{code:0x29});
+  for(let i=1;i<=12;i++)K(F(i),0,'F'+i,{code:0x3A+i-1});
+  K(15.5,0,'PrtSc',{code:0x46,name:'PrintScreen'});K(16.5,0,'ScrLk',{code:0x47,name:'Scroll Lock'});K(17.5,0,'Pause',{code:0x48});
+  K(0,1.5,'`',{code:0x35,sub:'Ё'});
+  for(let i=1;i<=10;i++)K(i,1.5,''+(i%10),{code:i<10?0x1D+i:0x27});
+  K(11,1.5,'-',{code:0x2D});K(12,1.5,'=',{code:0x2E});K(13,1.5,'⌫',{w:2,code:0x2A,name:'Backspace'});
+  K(15.5,1.5,'Ins',{code:0x49,name:'Insert'});K(16.5,1.5,'Home',{code:0x4A});K(17.5,1.5,'PgUp',{code:0x4B,name:'Page Up'});
+  K(19,1.5,'Num',{code:0x53,name:'Num Lock'});K(20,1.5,'/',{code:0x54,name:'Num /'});K(21,1.5,'*',{code:0x55,name:'Num *'});K(22,1.5,'-',{code:0x56,name:'Num -'});
+  K(0,2.5,'Tab',{w:1.5,code:0x2B});
+  const r2='QWERTYUIOP',r2r='ЙЦУКЕНГШЩЗ';
+  for(let i=0;i<10;i++)K(1.5+i,2.5,r2[i],{code:0x04+r2.charCodeAt(i)-65,sub:r2r[i]});
+  K(11.5,2.5,'[',{code:0x2F,sub:'Х'});K(12.5,2.5,']',{code:0x30,sub:'Ъ'});K(13.5,2.5,'\\',{w:1.5,code:0x31});
+  K(15.5,2.5,'Del',{code:0x4C,name:'Delete'});K(16.5,2.5,'End',{code:0x4D});K(17.5,2.5,'PgDn',{code:0x4E,name:'Page Down'});
+  K(19,2.5,'7',{code:0x5F,name:'Num 7'});K(20,2.5,'8',{code:0x60,name:'Num 8'});K(21,2.5,'9',{code:0x61,name:'Num 9'});K(22,2.5,'+',{h:2,code:0x57,name:'Num +'});
+  K(0,3.5,'Caps',{w:1.75,code:0x39,name:'Caps Lock'});
+  const r3='ASDFGHJKL',r3r='ФЫВАПРОЛД';
+  for(let i=0;i<9;i++)K(1.75+i,3.5,r3[i],{code:0x04+r3.charCodeAt(i)-65,sub:r3r[i]});
+  K(10.75,3.5,';',{code:0x33,sub:'Ж'});K(11.75,3.5,"'",{code:0x34,sub:'Э'});K(12.75,3.5,'Enter',{w:2.25,code:0x28});
+  K(19,3.5,'4',{code:0x5C,name:'Num 4'});K(20,3.5,'5',{code:0x5D,name:'Num 5'});K(21,3.5,'6',{code:0x5E,name:'Num 6'});
+  K(0,4.5,'Shift',{w:2.25,mod:0x02});
+  const r4='ZXCVBNM',r4r='ЯЧСМИТЬ';
+  for(let i=0;i<7;i++)K(2.25+i,4.5,r4[i],{code:0x04+r4.charCodeAt(i)-65,sub:r4r[i]});
+  K(9.25,4.5,',',{code:0x36,sub:'Б'});K(10.25,4.5,'.',{code:0x37,sub:'Ю'});K(11.25,4.5,'/',{code:0x38});
+  K(12.25,4.5,'Shift',{w:2.75,mod:0x20});
+  K(16.5,4.5,'↑',{code:0x52,name:'Стрелка вверх'});
+  K(19,4.5,'1',{code:0x59,name:'Num 1'});K(20,4.5,'2',{code:0x5A,name:'Num 2'});K(21,4.5,'3',{code:0x5B,name:'Num 3'});K(22,4.5,'Ent',{h:2,code:0x58,name:'Num Enter'});
+  K(0,5.5,'Ctrl',{w:1.25,mod:0x01});K(1.25,5.5,'Win',{w:1.25,mod:0x08});K(2.5,5.5,'Alt',{w:1.25,mod:0x04});
+  K(3.75,5.5,'Пробел',{w:6.25,code:0x2C});
+  K(10,5.5,'Alt',{w:1.25,mod:0x40});K(11.25,5.5,'Win',{w:1.25,mod:0x80});K(12.5,5.5,'Menu',{w:1.25,code:0x65});K(13.75,5.5,'Ctrl',{w:1.25,mod:0x10});
+  K(15.5,5.5,'←',{code:0x50,name:'Стрелка влево'});K(16.5,5.5,'↓',{code:0x51,name:'Стрелка вниз'});K(17.5,5.5,'→',{code:0x4F,name:'Стрелка вправо'});
+  K(19,5.5,'0',{w:2,code:0x62,name:'Num 0'});K(21,5.5,'.',{code:0x63,name:'Num .'});
+
+  for(let i=0;i<26;i++)CODE2HID['Key'+String.fromCharCode(65+i)]=4+i;
+  for(let i=1;i<=9;i++)CODE2HID['Digit'+i]=0x1D+i;CODE2HID.Digit0=0x27;
+  for(let i=1;i<=12;i++)CODE2HID['F'+i]=0x39+i;
+  Object.assign(CODE2HID,{Enter:0x28,Backspace:0x2A,Tab:0x2B,Space:0x2C,Minus:0x2D,Equal:0x2E,BracketLeft:0x2F,BracketRight:0x30,
+    Backslash:0x31,Semicolon:0x33,Quote:0x34,Backquote:0x35,Comma:0x36,Period:0x37,Slash:0x38,CapsLock:0x39,PrintScreen:0x46,
+    Pause:0x48,Insert:0x49,Home:0x4A,PageUp:0x4B,Delete:0x4C,End:0x4D,PageDown:0x4E,ArrowRight:0x4F,ArrowLeft:0x50,ArrowDown:0x51,ArrowUp:0x52,ContextMenu:0x65});
+})();
+
+function keyText(k,m){
+  const parts=Object.keys(MODN).map(Number).filter(b=>m&b).map(b=>MODN[b]);
+  if(k)parts.push(KEYS[k]||('код 0x'+k.toString(16).toUpperCase()));
+  return parts.length?parts.join(' + '):'—';
+}
+function buildKeyboard(root,onKey){
+  root.classList.add('kb');
+  const mapK={},mapM={};
+  LAYOUT.forEach(k=>{
+    const b=document.createElement('button');b.type='button';b.className='key'+(k.mod?' mod':'');
+    b.style.cssText=`left:calc(var(--u,40px)*${k.x} + 2px);top:calc(var(--u,40px)*${k.y} + 2px);width:calc(var(--u,40px)*${k.w} - 4px);height:calc(var(--u,40px)*${k.h} - 4px)`;
+    const s=document.createElement('span');s.textContent=k.label;b.appendChild(s);
+    if(k.sub){const sm=document.createElement('small');sm.textContent=k.sub;b.appendChild(sm)}
+    b.title=k.mod?MODN[k.mod]:(KEYS[k.code]||'');
+    if(onKey)b.onclick=()=>onKey(k);else{b.tabIndex=-1;b.style.pointerEvents='none'}
+    root.appendChild(b);
+    if(k.mod)mapM[k.mod]=b;else mapK[k.code]=b;
+  });
+  const fit=()=>{const w=root.clientWidth;if(w)root.style.setProperty('--u',(w/23)+'px')};
+  new ResizeObserver(fit).observe(root);fit();
+  return {mapK,mapM};
+}
+
+/* ================= Мышь ================= */
+const MOUSE=[
+ ['click_left','Левый клик'],['click_right','Правый клик'],['click_middle','Средний клик'],
+ ['move_up','Курсор вверх'],['move_down','Курсор вниз'],['move_left','Курсор влево'],['move_right','Курсор вправо'],
+ ['scroll_up','Прокрутка вверх'],['scroll_down','Прокрутка вниз']
+];
+const mouseTitle=id=>MOUSE.find(m=>m[0]===id)[1];
+function mouseId(b){
+  if(b.mact===1)return {1:'click_left',2:'click_right',4:'click_middle'}[b.vx]||'click_left';
+  if(b.mact===2)return b.vx<0?'move_left':b.vx>0?'move_right':b.vy<0?'move_up':'move_down';
+  return b.vy>0?'scroll_up':'scroll_down';
+}
+// Экранная мышь: интерактивная (onPick) в мастере и только для показа на вкладке проверки
+function buildMouse(root,onPick){
+  root.className='mousewrap'+(onPick?'':' passive');
+  root.innerHTML=`<div><div class="mouse">
+      <button type="button" class="mb" data-id="click_left">ЛКМ</button>
+      <div class="mid"><button type="button" class="mb" data-id="scroll_up">▲</button><button type="button" class="mb" data-id="click_middle">СКМ</button><button type="button" class="mb" data-id="scroll_down">▼</button></div>
+      <button type="button" class="mb" data-id="click_right">ПКМ</button><div class="body"></div></div>
+      <div class="lbl">Кнопки и колёсико</div></div>
+    <div><div class="pad"><div></div><button type="button" class="mb" data-id="move_up">↑</button><div></div>
+      <button type="button" class="mb" data-id="move_left">←</button><div class="ctr">·</div><button type="button" class="mb" data-id="move_right">→</button>
+      <div></div><button type="button" class="mb" data-id="move_down">↓</button><div></div></div>
+      <div class="lbl">Движение курсора</div></div>`;
+  const map={};
+  root.querySelectorAll('[data-id]').forEach(e=>{
+    map[e.dataset.id]=e;
+    if(onPick)e.onclick=()=>onPick(e.dataset.id);else e.tabIndex=-1;
+  });
+  return map;
+}
+function describe(b){
+  if(b.type===0)return {title:'Клавиша: '+keyText(b.key,b.mod),sub:'Клавиатура'};
+  const id=mouseId(b);
+  return {title:mouseTitle(id),sub:'Мышь'+(id.startsWith('move')?' · скорость '+Math.abs(b.vx||b.vy):'')};
+}
+const hexIr=n=>'0x'+(n>>>0).toString(16).toUpperCase().padStart(8,'0');
+
+/* ================= Уведомления ================= */
+let tt;function toast(t,k=''){const e=$('toast');e.textContent=t;e.className='show '+k;clearTimeout(tt);tt=setTimeout(()=>e.className='',2600)}
+
+/* ================= Обмен с устройством ================= */
+const pending=[];let chain=Promise.resolve();
+function rpc(bytes,expect,timeout=3000){
+  const run=()=>new Promise(async(res,rej)=>{
+    const buf=new Uint8Array(63);buf.set(bytes);
+    const w={cmd:expect,res};pending.push(w);
+    const t=setTimeout(()=>{const i=pending.indexOf(w);if(i>=0)pending.splice(i,1);rej(new Error('Устройство не отвечает'))},timeout);
+    w.res=d=>{clearTimeout(t);res(d)};
+    try{await dev.sendReport(3,buf)}catch(e){clearTimeout(t);const i=pending.indexOf(w);if(i>=0)pending.splice(i,1);rej(e)}
+  });
+  const p=chain.then(run,run);chain=p.catch(()=>{});return p;
+}
+const u32=(d,o)=>((d[o]<<24)|(d[o+1]<<16)|(d[o+2]<<8)|d[o+3])>>>0;
+function onReport(e){
+  const d=new Uint8Array(e.data.buffer,e.data.byteOffset,e.data.byteLength);
+  const cmd=d[0];
+  if(cmd===0x81){if(wizOpen()&&!$('s1').hidden)onIr(u32(d,1));return}
+  if(cmd===0x82){if(curTab==='t-test'&&!wizOpen())testDown(u32(d,1));return}
+  if(cmd===0x83){if(curTab==='t-test'&&!wizOpen())testUp(u32(d,1));return}
+  const i=pending.findIndex(p=>p.cmd===cmd);
+  if(i>=0){const w=pending.splice(i,1)[0];w.res(d)}
+}
+const wizOpen=()=>!$('wiz').hidden;
+const desiredMode=()=>wizOpen()?1:(curTab==='t-test'?2:0);
+async function applyMode(){
+  if(!dev)return;
+  try{await rpc([0x01,desiredMode()],0x01)}catch(e){toast(e.message,'bad')}
+}
+
+/* ================= Несохранённые изменения ================= */
+function setDirty(v){dirty=v;$('dirty').hidden=!v}
+async function commit(){
+  try{await rpc([0x09],0x09,6000);setDirty(false);toast('Сохранено в память устройства','ok');return true}
+  catch(e){toast(e.message,'bad');return false}
+}
+async function discard(){
+  try{
+    await rpc([0x0A],0x0A,6000);
+    await applyMode();await loadSettings();await loadBindings();
+    setDirty(false);toast('Изменения отменены');return true;
+  }catch(e){toast(e.message,'bad');return false}
+}
+$('dSaveBar').onclick=commit;
+$('dDiscardBar').onclick=()=>{if(confirm('Отменить все несохранённые изменения?'))discard()};
+addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+
+function shake(){const m=$('main');m.classList.remove('shake');void m.offsetWidth;m.classList.add('shake')}
+$('dStay').onclick=()=>{$('dlg').hidden=true;pendingTab=null};
+$('dSave').onclick=async()=>{if(await commit()){$('dlg').hidden=true;goTab(pendingTab)}};
+$('dForget').onclick=async()=>{if(await discard()){$('dlg').hidden=true;goTab(pendingTab)}};
+
+/* ================= Подключение ================= */
+async function pick(){
+  try{
+    const r=await navigator.hid.requestDevice({filters:[{usagePage:0xFF00,usage:0x01}]});
+    if(r[0])await attach(r[0]);else toast('Устройство не выбрано','bad');
+  }catch(e){toast('Не удалось подключиться: '+e.message,'bad')}
+}
+async function attach(d){
+  try{
+    dev=d;if(!dev.opened)await dev.open();
+    dev.oninputreport=onReport;
+    setDirty(false);setConn(true);
+    await applyMode();
+    await loadSettings();
+    await loadBindings();
+  }catch(e){toast(e.message,'bad')}
+}
+function setConn(on){
+  $('status').className=on?'on':'';
+  $('status').textContent=on?'Подключено'+(dev&&dev.productName?' · '+dev.productName:''):'Не подключено';
+  $('welcome').hidden=on;$('app').hidden=!on;$('connect').hidden=!on;
+}
+$('connect').onclick=pick;$('connectBig').onclick=pick;
+if(!hasHid){$('warn').hidden=false;$('connectBig').disabled=true}
+else{
+  navigator.hid.addEventListener('disconnect',e=>{
+    if(e.device===dev){const lost=dirty;dev=null;setDirty(false);setConn(false);$('wiz').hidden=true;$('dlg').hidden=true;
+      toast(lost?'Устройство отключено. Несохранённые изменения потеряны':'Устройство отключено','bad')}
+  });
+  navigator.hid.getDevices().then(l=>{const d=l.find(x=>x.collections.some(c=>c.usagePage===0xFF00));if(d)attach(d)});
+}
+
+/* ================= Вкладки ================= */
+function goTab(id){
+  if(!id)return;
+  curTab=id;
+  document.querySelectorAll('#nav button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===id));
+  document.querySelectorAll('.tab').forEach(t=>t.hidden=t.id!==id);
+  if(id==='t-test')resetTest();
+  applyMode();
+}
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{
+  const id=b.dataset.tab;
+  if(id===curTab)return;
+  if(dirty){shake();pendingTab=id;$('dlg').hidden=false;return}
+  goTab(id);
+});
+
+/* ================= Список привязок ================= */
+const dec=new TextDecoder();
+async function loadBindings(){
+  $('cnt').textContent='Загружаю…';
+  const h=await rpc([0x07],0x07);
+  const n=h[1];maxB=h[2]||60;
+  const out=[];
+  for(let i=0;i<n;i++){
+    const d=await rpc([0x08,i],0x08);
+    if(d[2]){
+      let e=15;while(e<38&&d[e])e++;
+      out.push({idx:i,ir:u32(d,3),type:d[7],key:d[8],mod:d[9],mact:d[10],vx:d[11]<<24>>24,vy:d[12]<<24>>24,name:dec.decode(d.slice(15,e))});
+    }
+  }
+  bindings=out;renderList();
+}
+function renderList(){
+  const L=$('list');L.innerHTML='';
+  $('cnt').textContent=bindings.length?`Назначено: ${bindings.length} из ${maxB}`:'Пока ничего не назначено';
+  $('add').disabled=bindings.length>=maxB;
+  if(!bindings.length){L.innerHTML='<div class="empty">Здесь появятся ваши кнопки.<br>Нажмите «Добавить кнопку», чтобы начать.</div>';return}
+  bindings.forEach(b=>{
+    const a=describe(b);
+    const r=document.createElement('div');r.className='bind';
+    r.innerHTML=`<div class="code"><small></small><span class="c"></span></div>
+      <div class="act"><b class="t"></b><span class="sub"></span></div>
+      <div class="btns"><button data-e>Изменить</button><button class="danger" data-d>Удалить</button></div>`;
+    r.querySelector('.c').textContent=b.name||hexIr(b.ir);
+    r.querySelector('.code small').textContent=b.name?'название':'кнопка пульта';
+    r.querySelector('.t').textContent=b.name?b.name:a.title;
+    r.querySelector('.sub').textContent=b.name?(a.title+' · '+hexIr(b.ir)):a.sub;
+    r.querySelector('[data-d]').onclick=async()=>{
+      if(!confirm('Удалить эту кнопку?\n'+(b.name||a.title)))return;
+      try{
+        await rpc([0x04,b.idx],0x04);
+        bindings.splice(bindings.indexOf(b),1);bindings.forEach((x,i)=>x.idx=i);
+        setDirty(true);renderList();
+      }catch(e){toast(e.message,'bad')}
+    };
+    r.querySelector('[data-e]').onclick=()=>openWiz(b);
+    L.appendChild(r);
+  });
+}
+
+/* ================= Мастер ================= */
+let kbW=null,mouseW=null;
+function setStep(n){
+  ['s1','s2','s3'].forEach((id,i)=>$(id).hidden=(i+1)!==n);
+  ['p1','p2','p3'].forEach((id,i)=>$(id).className=(i+1)<=n?'on':'');
+  $('modal').classList.toggle('wide',n===2&&wiz.type===0);
+  if(n===3)setTimeout(()=>$('nameIn').focus(),50);
+}
+function openWiz(edit){
+  wiz={ir:0,type:0,key:0,mod:0,mact:'click_left',step:15,name:''};
+  if(edit){
+    wiz.ir=edit.ir;wiz.type=edit.type;wiz.key=edit.key;wiz.mod=edit.mod;wiz.name=edit.name;
+    if(edit.type===1){wiz.mact=mouseId(edit);if(wiz.mact.startsWith('move'))wiz.step=Math.abs(edit.vx||edit.vy)||15}
+  }
+  $('mStep').value=wiz.step;$('mStepV').textContent=wiz.step;$('nameIn').value=wiz.name;
+  $('waitBox').hidden=false;$('gotBox').hidden=true;$('n1').disabled=true;$('exist').hidden=true;
+  if(!kbW)kbW=buildKeyboard($('kbWiz'),onWizKey);
+  if(!mouseW)mouseW=buildMouse($('mouseWiz'),id=>{wiz.mact=id;syncWiz()});
+  $('wiz').hidden=false;
+  syncWiz();
+  if(edit){showIr(wiz.ir);setStep(2)}else setStep(1);
+  applyMode();
+}
+function closeWiz(){$('wiz').hidden=true;applyMode()}
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeWiz);
+$('add').onclick=()=>openWiz();
+
+function showIr(code){
+  $('irCode').textContent=hexIr(code);
+  $('waitBox').hidden=true;$('gotBox').hidden=false;$('n1').disabled=false;
+  const ex=bindings.find(b=>b.ir===code);
+  if(ex){$('exist').hidden=false;$('exist').textContent='Эта кнопка уже настроена: «'+(ex.name||describe(ex).title)+'». Если продолжите, старое действие будет заменено.'}
+  else $('exist').hidden=true;
+}
+function onIr(code){wiz.ir=code;showIr(code)}
+$('n1').onclick=()=>setStep(2);
+$('b2').onclick=()=>setStep(1);
+$('b3').onclick=()=>setStep(2);
+
+document.querySelectorAll('#typeOpts .opt').forEach(o=>{
+  const act=()=>{wiz.type=+o.dataset.type;syncWiz();$('modal').classList.toggle('wide',wiz.type===0)};
+  o.onclick=act;o.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}};
+});
+function syncWiz(){
+  document.querySelectorAll('#typeOpts .opt').forEach(o=>o.setAttribute('aria-pressed',+o.dataset.type===wiz.type));
+  $('kbPane').hidden=wiz.type!==0;$('mPane').hidden=wiz.type!==1;
+  $('stepRow').hidden=!(wiz.type===1&&wiz.mact.startsWith('move'));
+  if(kbW){
+    Object.entries(kbW.mapK).forEach(([c,e])=>e.classList.toggle('sel',+c===wiz.key));
+    Object.entries(kbW.mapM).forEach(([m,e])=>e.classList.toggle('sel',!!(wiz.mod&+m)));
+  }
+  if(mouseW)Object.entries(mouseW).forEach(([id,e])=>e.classList.toggle('sel',id===wiz.mact));
+  $('kbSel').textContent=keyText(wiz.key,wiz.mod);
+  $('mSel').textContent=mouseTitle(wiz.mact);
+  $('n2').disabled=wiz.type===0&&!wiz.key&&!wiz.mod;
+}
+function onWizKey(k){
+  if(k.mod)wiz.mod^=k.mod;else wiz.key=(wiz.key===k.code)?0:k.code;
+  syncWiz();
+}
+$('kbReset').onclick=()=>{wiz.key=0;wiz.mod=0;syncWiz()};
+$('mStep').oninput=()=>{wiz.step=+$('mStep').value;$('mStepV').textContent=wiz.step};
+
+addEventListener('keydown',e=>{
+  if(!wizOpen())return;
+  if(e.key==='Escape'){if(e.target.id!=='nameIn')closeWiz();return}
+  if($('s2').hidden||wiz.type!==0||e.target.tagName==='INPUT')return;
+  const hid=CODE2HID[e.code];if(!hid)return;
+  e.preventDefault();wiz.key=hid;syncWiz();
+});
+
+function nameBytes(){
+  const enc=new TextEncoder();let s=wiz.name;
+  while(enc.encode(s).length>23)s=s.slice(0,-1);
+  return enc.encode(s);
+}
+$('nameIn').oninput=()=>{
+  const enc=new TextEncoder();let s=$('nameIn').value;
+  while(enc.encode(s).length>23)s=s.slice(0,-1);
+  if(s!==$('nameIn').value)$('nameIn').value=s;
+  wiz.name=s;
+};
+
+function buildPayload(){
+  const b=new Uint8Array(63);b[0]=0x02;
+  const c=wiz.ir;b[1]=(c>>>24)&255;b[2]=(c>>>16)&255;b[3]=(c>>>8)&255;b[4]=c&255;b[5]=wiz.type;
+  if(wiz.type===0){b[6]=wiz.key;b[7]=wiz.mod}
+  else{
+    const s=wiz.step,a=wiz.mact;
+    if(a==='click_left'){b[8]=1;b[9]=1}
+    if(a==='click_right'){b[8]=1;b[9]=2}
+    if(a==='click_middle'){b[8]=1;b[9]=4}
+    if(a==='move_up'){b[8]=2;b[10]=-s&255}
+    if(a==='move_down'){b[8]=2;b[10]=s}
+    if(a==='move_left'){b[8]=2;b[9]=-s&255}
+    if(a==='move_right'){b[8]=2;b[9]=s}
+    if(a==='scroll_up'){b[8]=3;b[10]=1}
+    if(a==='scroll_down'){b[8]=3;b[10]=255}
+  }
+  b.set(nameBytes(),13);
+  return b;
+}
+$('n2').onclick=()=>{
+  const p=buildPayload();
+  const a=describe({type:p[5],key:p[6],mod:p[7],mact:p[8],vx:p[9]<<24>>24,vy:p[10]<<24>>24});
+  $('sumCode').innerHTML='<small style="display:block;color:var(--mute);font-family:inherit;font-size:11px">кнопка пульта</small>'+hexIr(wiz.ir);
+  $('sumAct').innerHTML='<b></b><span class="sub"></span>';
+  $('sumAct').querySelector('b').textContent=a.title;$('sumAct').querySelector('.sub').textContent=a.sub;
+  setStep(3);
+};
+// Применить в ОЗУ устройства (во флеш не пишем): кнопка сразу работает
+async function applyBinding(){
+  const p=buildPayload();
+  try{
+    const r=await rpc(p,0x02);
+    if(r[4]!==1){toast('Нет места: достигнут предел кнопок','bad');return false}
+    const nb={ir:wiz.ir,type:p[5],key:p[6],mod:p[7],mact:p[8],vx:p[9]<<24>>24,vy:p[10]<<24>>24,name:wiz.name};
+    const i=bindings.findIndex(x=>x.ir===nb.ir);
+    if(i>=0)bindings[i]=nb;else bindings.push(nb);
+    bindings.forEach((x,k)=>x.idx=k);
+    setDirty(true);renderList();
+    return true;
+  }catch(e){toast(e.message,'bad');return false}
+}
+$('save').onclick=async()=>{if(await applyBinding()){toast('Кнопка применена','ok');closeWiz()}};
+$('saveMore').onclick=async()=>{if(await applyBinding()){toast('Кнопка применена','ok');openWiz()}};
+
+/* ================= Проверка ================= */
+let kbT=null,mouseT=null,litEls=[],litStart=0,offTimer=0;
+function ensureTest(){if(!kbT)kbT=buildKeyboard($('kbTest'),null);if(!mouseT)mouseT=buildMouse($('mouseTest'),null)}
+function clearLit(){litEls.forEach(e=>e.classList.remove('lit'));litEls=[]}
+function lit(e){if(e){e.classList.add('lit');litEls.push(e)}}
+function resetTest(){
+  ensureTest();clearTimeout(offTimer);clearLit();
+  $('testInfo').className='info';$('testInfo').textContent='Жду нажатие на пульте…';$('testBad').hidden=true;
+}
+function testDown(code){
+  ensureTest();clearTimeout(offTimer);clearLit();litStart=Date.now();
+  const b=bindings.find(x=>x.ir===code);
+  if(!b){
+    $('testInfo').className='info';$('testInfo').textContent='Эта кнопка не привязана';
+    $('testBad').hidden=false;$('testBad').innerHTML='Не привязанная клавиша: <b></b>';$('testBad').querySelector('b').textContent=hexIr(code);
+    return;
+  }
+  $('testBad').hidden=true;
+  if(b.type===0){
+    Object.keys(kbT.mapM).forEach(m=>{if(b.mod&+m)lit(kbT.mapM[m])});
+    if(b.key)lit(kbT.mapK[b.key]);
+  }else lit(mouseT[mouseId(b)]);
+  const a=describe(b);
+  $('testInfo').className='info on';
+  $('testInfo').textContent=(b.name?b.name+' — ':'')+a.title;
+}
+function testUp(){
+  const wait=Math.max(0,350-(Date.now()-litStart));
+  clearTimeout(offTimer);
+  offTimer=setTimeout(()=>{clearLit();$('testInfo').className='info'},wait);
+}
+
+/* ================= Подсветка (применяется сразу, сохраняется отдельно) ================= */
+const parseHex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const toHex=(r,g,b)=>'#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+function orb(){
+  [['oW','wC','wB'],['oC','cC','cB'],['oI','iC','iB']].forEach(([o,c,b])=>{
+    const [r,g,bl]=parseHex($(c).value),k=($(b).value/100)*($('gB').value/100);
+    $(o).style.background=`rgb(${r*k|0},${g*k|0},${bl*k|0})`;
+  });
+  [['wB','wBV'],['cB','cBV'],['iB','iBV'],['gB','gBV']].forEach(([a,b])=>$(b).textContent=$(a).value+'%');
+}
+async function loadSettings(){
+  const d=await rpc([0x05],0x05);
+  $('wC').value=toHex(d[1],d[2],d[3]);$('wB').value=d[4];
+  $('cC').value=toHex(d[5],d[6],d[7]);$('cB').value=d[8];
+  $('iC').value=toHex(d[9],d[10],d[11]);$('iB').value=d[12];
+  $('gB').value=d[13];$('iFlashEn').checked=!!d[14];orb();
+}
+let ledTmr=null;
+async function applyLed(){
+  const [wR,wG,wB]=parseHex($('wC').value),[cR,cG,cB]=parseHex($('cC').value),[iR,iG,iB]=parseHex($('iC').value);
+  try{
+    await rpc([0x06,wR,wG,wB,+$('wB').value,cR,cG,cB,+$('cB').value,iR,iG,iB,+$('iB').value,+$('gB').value,$('iFlashEn').checked?1:0],0x06);
+    setDirty(true);
+  }catch(e){toast(e.message,'bad')}
+}
+function ledChanged(){orb();clearTimeout(ledTmr);ledTmr=setTimeout(applyLed,120)}
+['wC','wB','cC','cB','iC','iB','gB','iFlashEn'].forEach(id=>{$(id).oninput=ledChanged;$(id).onchange=ledChanged});
+
+/* ================= Сервис ================= */
+$('bClear').onclick=async()=>{
+  if(!confirm('Удалить ВСЕ назначенные кнопки?\nИзменение можно отменить, пока вы не нажали «Сохранить в память».'))return;
+  try{await rpc([0x03],0x03);bindings=[];setDirty(true);renderList();toast('Все кнопки удалены (не сохранено)')}catch(e){toast(e.message,'bad')}
+};
+$('boot').onclick=async()=>{
+  if(!confirm('Перезагрузить устройство в режим прошивки?'+(dirty?'\nНесохранённые изменения будут потеряны.':'')))return;
+  try{const b=new Uint8Array(63);b[0]=0x0F;await dev.sendReport(3,b)}catch(e){}
+};
+orb();
+</script>
+<!-- Вставьте ЭТОТ блок в вашу страницу сразу после последнего </script>, перед </body>. -->
+<!-- Вставьте ЭТОТ блок в вашу страницу сразу после последнего </script>, перед </body>. -->
+<script>
+(()=>{
+/* --- режим: пока страница открыта, пульт «тихий» (в ПК ничего не уходит); при закрытии вкладки прошивка сама вернёт работу --- */
+/* Переключатель «пульт управляет компьютером». По умолчанию выключен; при каждом подключении сбрасывается. */
+let live=false;
+const bar=document.createElement('section');
+bar.style.cssText='display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;border-left:4px solid var(--bar)';
+const bt=document.createElement('span'),bb=document.createElement('button');
+bar.append(bt,bb);$('nav').before(bar);
+const forced=()=>wizOpen()?1:curTab==='t-test'?2:0;
+const renderBar=()=>{
+  const f=forced();
+  bb.disabled=!!f;bb.className=live?'':'primary';
+  bb.textContent=live?'Выключить управление':'Включить управление';
+  bar.style.borderLeftColor=(!f&&live)?'var(--ok)':'var(--bar)';
+  bt.textContent=f===1?'Идёт добавление кнопки: пульт временно не управляет компьютером.'
+    :f===2?'На вкладке «Проверка» пульт не управляет компьютером, нажатия показываются здесь.'
+    :live?'Сейчас пульт управляет компьютером: кнопки нажимают клавиши и двигают мышь.'
+    :'Сейчас пульт не управляет компьютером, так безопаснее настраивать. Включите, чтобы пользоваться пультом как обычно.'};
+bb.onclick=()=>{live=!live;applyMode()};
+applyMode=async function(){
+  renderBar();if(!dev)return;
+  try{await rpc([0x01,wizOpen()?1:curTab==='t-test'?2:live?0:2],0x01)}catch(e){toast(e.message,'bad')}};
+renderBar();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)applyMode()});
+
+/* Heartbeat идёт из воркера: фоновые вкладки не душат его таймеры. Пока он идёт, «тихий» режим не сбросится. */
+const hb=new Uint8Array(63);hb[0]=0x0D;
+const tick=()=>{if(dev&&dev.opened)dev.sendReport(3,hb).catch(()=>{})};
+try{const w=new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),1500)'])));w.onmessage=tick}
+catch(e){setInterval(tick,1500)}
+
+/* --- вкладки без «Вы забыли сохранить!» --- */
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{if(b.dataset.tab!==curTab)goTab(b.dataset.tab)});
+
+/* --- автосохранение в память устройства --- */
+commit=async function(){
+  try{const r=await rpc([0x09],0x09,6000);
+    if(r[4]!==1){toast('Не удалось записать в память устройства','bad');return false}
+    setDirty(false);toast('Сохранено','ok');return true}
+  catch(e){toast(e.message,'bad');return false}
+};
+let at;const _sd=setDirty;
+setDirty=function(v){_sd(v);clearTimeout(at);if(v)at=setTimeout(()=>{if(dirty&&dev)commit()},1200)};
+$('dirty').querySelector('span').textContent='Сохраняю в память устройства…';
+$('dDiscardBar').hidden=true;$('dSaveBar').textContent='Сохранить сейчас';$('dSaveBar').onclick=()=>commit();
+$('save').textContent='Готово';$('saveMore').textContent='Готово и добавить ещё';
+$('s3').querySelector('.hint').textContent='Кнопка начнёт работать сразу и сама сохранится в память устройства. До 11 русских или 23 латинских букв.';
+
+/* --- подключение --- */
+pick=async()=>{try{
+  const r=await navigator.hid.requestDevice({filters:[{usagePage:0xFF00,usage:1}]});
+  if(r[0])await attach(r[0]);else toast('Окно закрыто, устройство не выбрано')
+}catch(e){toast('Не удалось подключиться: '+e.message,'bad')}};
+$('connectBig').onclick=pick;
+const isFox=d=>/foxir/i.test(d.productName||'');
+const err=document.createElement('div');err.hidden=true;
+err.style.cssText='border:1px solid var(--bad);color:var(--bad);border-radius:6px;padding:12px;margin:14px auto;max-width:520px;text-align:left';
+$('welcome').querySelector('.steps').before(err);
+const showErr=m=>{err.textContent=m;err.hidden=!m};
+// Возврат на экран подключения (drop=true: ещё и забыть чужое устройство)
+async function leave(msg,drop){
+  const d=dev;dev=null;live=false;setDirty(false);setConn(false);$('wiz').hidden=true;$('dlg').hidden=true;
+  if(d){d.oninputreport=null;try{await d.close()}catch(e){}if(drop)try{await d.forget()}catch(e){}}
+  showErr(msg||'')}
+$('connect').textContent='Сменить устройство';
+$('connect').onclick=async()=>{if(dirty)await commit();await leave('')};
+if(hasHid){
+  navigator.hid.addEventListener('connect',e=>{if(!dev&&isFox(e.device))attach(e.device)});
+  navigator.hid.getDevices().then(l=>{const f=l.find(isFox);if(f)attach(f)});
+}
+if(!window.isSecureContext){$('warn').textContent='WebHID работает только на https://, localhost или с локального файла. Откройте страницу так.';$('warn').hidden=false}
+const _t=toast;
+toast=(t,k)=>_t(/open the device|Failed to open/i.test(t)?'Не удаётся открыть устройство. Закройте другие вкладки с настройщиком и программы, которые могут его использовать, и повторите.':t,k);
+$('welcome').insertAdjacentHTML('beforeend','<details class="mute" style="margin:18px auto 0;max-width:520px;text-align:left"><summary>Не видите FoxIR в списке?</summary><ul><li>Попробуйте другой USB-порт и другой кабель: бывают кабели «только для зарядки».</li><li>Закройте другие вкладки и программы с настройщиком.</li><li>Откройте страницу в Chrome или Edge на компьютере.</li><li>В Linux может понадобиться правило udev для доступа к устройству.</li></ul></details>');
+// Подключение: сначала проверяем имя и «рукопожатие», и только потом работаем с устройством.
+// Чужому устройству (геймпад и т.п.) ничего не отправляется.
+const _at=attach;let q=Promise.resolve();
+async function doAttach(d){
+  if(dev===d)return;
+  showErr('');live=false;
+  if(!isFox(d)){
+    showErr('Выбрано другое устройство («'+(d.productName||'без имени')+'»), это не FoxIR. Выберите в окне именно FoxIR.');
+    try{await d.forget()}catch(e){}return}
+  try{dev=d;if(!d.opened)await d.open();d.oninputreport=onReport}
+  catch(e){await leave('Не удаётся открыть устройство. Закройте другие вкладки с настройщиком и программы, которые могут его использовать, и повторите.');return}
+  let r;
+  try{r=await rpc([0x0E],0x0E,1500)}
+  catch(e){await leave('Устройство не отвечает как FoxIR, вероятно, прошивка устарела. Прошейте новую версию и подключитесь снова.');return}
+  if(r[4]<2){await leave('Прошивка устарела. Прошейте новую версию и подключитесь снова.');return}
+  await _at(d);
+  if(dev&&!r[5])toast('Память устройства недоступна: настройки не сохранятся. В Arduino IDE выберите Flash Size с файловой системой (FS)','bad');
+}
+attach=d=>q=q.then(()=>doAttach(d)).catch(()=>{});
+
+/* --- события от устройства --- */
+const unk=document.createElement('div');unk.className='hint';unk.style.textAlign='center';$('waitBox').after(unk);
+const _or=onReport;
+onReport=function(e){
+  if(e.reportId!==3)return;
+  const d=new Uint8Array(e.data.buffer,e.data.byteOffset,e.data.byteLength);
+  if(d[0]===0x84){if(wizOpen()&&!$('s1').hidden)unk.textContent='Сигнал принят, но не распознан. Нажмите кнопку короче и ближе к устройству. Если так на всех кнопках, пульт, скорее всего, не поддерживается.';return}
+  _or(e)};
+if(dev)dev.oninputreport=onReport;
+const _oi=onIr;onIr=c=>{unk.textContent='';_oi(c)};
+let ht;const _ow=openWiz;
+openWiz=function(e){_ow(e);unk.textContent='';clearTimeout(ht);
+  if(!e)ht=setTimeout(()=>{if(!$('s1').hidden&&$('gotBox').hidden)unk.textContent='Ничего не приходит? Направьте пульт на устройство, проверьте батарейку и что пульт инфракрасный (не Bluetooth и не радио). Через камеру телефона видно, мигает ли пульт.'},10000)};
+
+/* --- запись сочетания с физической клавиатуры только по кнопке --- */
+const MC={ControlLeft:1,ShiftLeft:2,AltLeft:4,MetaLeft:8,ControlRight:0x10,ShiftRight:0x20,AltRight:0x40,MetaRight:0x80};
+for(let i=0;i<10;i++)CODE2HID['Numpad'+i]=i?0x58+i:0x62;
+Object.assign(CODE2HID,{NumpadDivide:0x54,NumpadMultiply:0x55,NumpadSubtract:0x56,NumpadAdd:0x57,NumpadEnter:0x58,NumpadDecimal:0x63,NumLock:0x53,ScrollLock:0x47,Escape:0x29});
+let rec=false;
+const rb=document.createElement('button');rb.className='ghost';rb.style.padding='4px 10px';
+const rbT=()=>rb.textContent=rec?'Жмите сочетание…':'Записать с клавиатуры';rbT();
+rb.onclick=()=>{rec=!rec;rbT()};$('kbReset').before(rb);
+addEventListener('keydown',e=>{
+  if(!wizOpen()||$('s2').hidden||wiz.type!==0||e.target.tagName==='INPUT')return;
+  if(!rec){if(e.code!=='Escape')e.stopImmediatePropagation();return}
+  e.preventDefault();e.stopImmediatePropagation();
+  if(MC[e.code])wiz.mod|=MC[e.code];
+  else if(CODE2HID[e.code]){
+    wiz.key=CODE2HID[e.code];
+    wiz.mod|=(e.ctrlKey?1:0)|(e.shiftKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);
+    rec=false;rbT()}
+  syncWiz()},true);
+
+/* --- название кнопки --- */
+const cnt=document.createElement('div');cnt.className='hint';$('nameIn').after(cnt);
+const upd=()=>cnt.textContent=new TextEncoder().encode($('nameIn').value).length+' из 23 байт (русская буква = 2, латинская = 1)';
+$('nameIn').addEventListener('input',upd);upd();
+$('nameIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('save').click()});
+const _rl=renderList;
+renderList=function(){_rl();
+  [...$('list').querySelectorAll('.bind')].forEach((r,i)=>{const b=bindings[i];if(!b||!b.name)return;
+    r.querySelector('.c').textContent=hexIr(b.ir);r.querySelector('.code small').textContent='кнопка пульта';
+    r.querySelector('.t').textContent=b.name;r.querySelector('.sub').textContent=describe(b).title})};
+
+/* --- проверка: быстрая привязка --- */
+const _td=testDown;
+testDown=function(c){_td(c);
+  if(!bindings.some(b=>b.ir===c)){const b=document.createElement('button');
+    b.className='primary';b.style.marginLeft='12px';b.textContent='Привязать';
+    b.onclick=()=>{goTab('t-list');openWiz();onIr(c)};$('testBad').appendChild(b)}};
+
+/* --- сервис и подсветка --- */
+$('gB').min=5;
+const dt=document.createElement('details');
+dt.innerHTML='<summary class="mute">Дополнительно</summary><p class="hint" style="margin:8px 0">Откроется режим прошивки (появится диск RPI-RP2). Чтобы вернуться, выньте и снова вставьте устройство.</p>';
+$('boot').before(dt);dt.appendChild($('boot'));
+})();
+</script>
+</body>
+</html>

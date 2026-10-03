@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoxFJ — настройщик</title>
+<style>
+:root{--bg:#dfe5ea;--panel:#f6f8f9;--ink:#14202b;--mute:#5d6b78;--line:#b9c4cd;--bar:#f2a900;--ok:#1f7a4d;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#161d24;--panel:#1f2831;--ink:#e6ecf1;--mute:#93a1ae;--line:#34424f;--ok:#4cc38a;--bad:#ff6b61}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Bahnschrift,"DIN Alternate","Segoe UI",system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;margin-bottom:14px}
+h1{font-size:28px;margin:0}
+h2{font-size:17px;margin:0 0 12px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:14px}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--ink);border-radius:4px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:var(--ink);color:var(--panel)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+button.danger{border-color:var(--bad);color:var(--bad)}
+button.danger:hover:not(:disabled){background:var(--bad);color:#fff}
+#status{color:var(--mute)}#status.on{color:var(--ok)}
+nav{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--line);margin-bottom:14px}
+nav button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;margin-bottom:-2px;padding:8px 14px}
+nav button:hover{background:none;color:var(--ink);border-bottom-color:var(--line)}
+nav button[aria-selected=true]{border-bottom-color:var(--bar);font-weight:600}
+.stage{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start;justify-content:center}
+#pad{width:260px;height:260px;background:var(--bg);border-radius:6px;display:block}
+.vs{display:flex;gap:14px}
+.v{display:flex;flex-direction:column;align-items:center;gap:6px}
+.vt{width:26px;height:260px;background:var(--bg);border:1px solid var(--line);border-radius:4px;position:relative;overflow:hidden}
+.vf{position:absolute;left:0;right:0;bottom:0;height:0;background:var(--bar)}
+.side{display:flex;flex-direction:column;gap:18px;align-items:center}
+.grid8{display:grid;grid-template-columns:repeat(4,38px);gap:6px}
+.led{height:30px;border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;font-size:13px;color:var(--mute)}
+.led.on{background:var(--bar);border-color:var(--ink);color:#14202b;font-weight:600}
+#dpad{width:110px;height:110px}
+#dpad polygon{fill:var(--bg);stroke:var(--line);stroke-width:2}
+#dpad polygon.on{fill:var(--bar);stroke:var(--ink)}
+#dpad circle{fill:var(--panel);stroke:var(--line);stroke-width:2}
+.axis{display:grid;grid-template-columns:34px 1fr 150px;gap:10px;align-items:center;margin:8px 0}
+.track{height:16px;background:var(--bg);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden}
+.fill{position:absolute;inset:0 auto 0 0;width:50%;background:var(--bar)}
+.num{font-variant-numeric:tabular-nums;text-align:right;font-size:13px;color:var(--mute)}
+.num b{color:var(--ink);font-weight:600}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:10px}
+th,td{text-align:right;padding:4px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--mute);font-size:13px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.row:first-of-type{margin-top:0}
+.msg{min-height:1.4em;color:var(--mute);margin:8px 0 0}.msg.bad{color:var(--bad)}.msg.ok{color:var(--ok)}
+label{display:inline-flex;gap:6px;align-items:center;margin-right:14px}
+.lab{min-width:170px}
+input[type=range]{width:min(300px,100%);accent-color:var(--bar)}
+input[type=color]{width:56px;height:34px;padding:2px;border:1px solid var(--ink);border-radius:4px;background:var(--panel)}
+#sw{width:34px;height:34px;border-radius:50%;border:1px solid var(--ink)}
+#warn{display:none;border:1px solid var(--bad);color:var(--bad);border-radius:6px;padding:12px;margin-bottom:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>FoxFJ</h1><div id="status">Не подключено</div></div>
+  <button id="connect">Подключить джойстик</button>
+</header>
+<div id="warn">Этот браузер не поддерживает WebHID. Откройте страницу в Chrome или Edge.</div>
+
+<nav role="tablist" id="nav">
+  <button role="tab" data-tab="t-over" aria-selected="true">Обзор</button>
+  <button role="tab" data-tab="t-cal" aria-selected="false">Калибровка</button>
+  <button role="tab" data-tab="t-axes" aria-selected="false">Оси</button>
+  <button role="tab" data-tab="t-led" aria-selected="false">Подсветка</button>
+  <button role="tab" data-tab="t-svc" aria-selected="false">Сервис</button>
+</nav>
+
+<div class="tab" id="t-over">
+  <section>
+    <div class="stage">
+      <canvas id="pad" aria-label="Положение стика X/Y"></canvas>
+      <div class="vs">
+        <div class="v"><div class="vt"><div class="vf" id="vz"></div></div><b>Z</b></div>
+        <div class="v"><div class="vt"><div class="vf" id="vrz"></div></div><b>Rz</b></div>
+      </div>
+      <div class="side">
+        <div class="grid8" id="btns"></div>
+        <svg id="dpad" viewBox="0 0 100 100" aria-label="Хатка">
+          <polygon id="hu" points="50,6 72,34 28,34"/><polygon id="hr" points="94,50 66,28 66,72"/>
+          <polygon id="hd" points="50,94 72,66 28,66"/><polygon id="hl" points="6,50 34,28 34,72"/>
+          <circle cx="50" cy="50" r="9"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+  <section>
+    <h2>Значения осей</h2>
+    <div id="axes"></div>
+  </section>
+</div>
+
+<div class="tab" id="t-cal" hidden>
+  <section>
+    <h2>Калибровка</h2>
+    <p style="margin-top:0">Нажмите «Начать», прокрутите все оси от края до края, верните стики в центр и нажмите «Завершить».</p>
+    <div class="row">
+      <button id="cStart" class="needs" disabled>Начать калибровку</button>
+      <button id="cFinish" disabled>Завершить и сохранить</button>
+      <span id="cState" class="num"></span>
+    </div>
+    <table><thead><tr><th>Ось</th><th>Минимум</th><th>Максимум</th><th>Центр</th></tr></thead><tbody id="ctable"></tbody></table>
+    <p class="msg" id="cMsg"></p>
+  </section>
+</div>
+
+<div class="tab" id="t-axes" hidden>
+  <section>
+    <h2>Оси</h2>
+    <div class="row" id="inv"></div>
+    <div class="row">
+      <span class="lab">Мёртвая зона стиков</span>
+      <input type="range" id="dz" class="needs" min="0" max="8000" step="50" disabled>
+      <span class="num" id="dzv" style="min-width:48px"></span>
+    </div>
+    <div class="row"><button class="save needs" disabled>Сохранить настройки</button></div>
+    <p class="msg smsg">Изменения применяются сразу, но пропадут после отключения, пока вы их не сохраните.</p>
+  </section>
+</div>
+
+<div class="tab" id="t-led" hidden>
+  <section>
+    <h2>Подсветка</h2>
+    <div class="row">
+      <span class="lab">Цвет в работе</span>
+      <input type="color" id="lc" class="needs" value="#00ff00" disabled>
+      <div id="sw" title="Примерный вид"></div>
+    </div>
+    <div class="row">
+      <span class="lab">Яркость в работе</span>
+      <input type="range" id="lb" class="needs" min="0" max="100" disabled>
+      <span class="num" id="lbv" style="min-width:48px"></span>
+    </div>
+    <div class="row">
+      <span class="lab">Общая яркость</span>
+      <input type="range" id="lg" class="needs" min="0" max="100" disabled>
+      <span class="num" id="lgv" style="min-width:48px"></span>
+    </div>
+    <p class="msg" style="min-height:0">«Яркость в работе» не влияет на сигналы ошибок и калибровки. «Общая яркость» меняет всё.</p>
+    <div class="row"><button class="save needs" disabled>Сохранить настройки</button></div>
+    <p class="msg smsg"></p>
+  </section>
+</div>
+
+<div class="tab" id="t-svc" hidden>
+  <section>
+    <h2>Сервис</h2>
+    <div class="row"><button id="boot" class="danger needs" disabled>Перезагрузить в режим прошивки</button></div>
+  </section>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id), NAMES=['X','Y','Z','Rz'];
+let dev=null,waiter=null,chain=Promise.resolve(),calibPoll=null,wasCalib=false,tmr=null;
+const S={x:32767,y:32767,z:0,rz:0};
+
+// --- интерфейс ---
+NAMES.forEach((n,i)=>{
+  $('axes').insertAdjacentHTML('beforeend',`<div class="axis"><b>${n}</b><div class="track"><div class="fill" id="f${i}"></div></div><div class="num"><b id="o${i}">0</b> · АЦП <span id="r${i}">0</span></div></div>`);
+  $('ctable').insertAdjacentHTML('beforeend',`<tr><td>${n}</td><td id="cmin${i}">–</td><td id="cmax${i}">–</td><td id="cc${i}">${i<2?'–':'нет'}</td></tr>`);
+  $('inv').insertAdjacentHTML('beforeend',`<label><input type="checkbox" id="iv${i}" class="needs" disabled> Инвертировать ${n}</label>`);
+});
+for(let i=0;i<8;i++) $('btns').insertAdjacentHTML('beforeend',`<div class="led" id="b${i}">${i+1}</div>`);
+if(!('hid' in navigator)){$('warn').style.display='block';$('connect').disabled=true;}
+
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#nav button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  document.querySelectorAll('.tab').forEach(t=>t.hidden=t.id!==b.dataset.tab);
+  if(b.dataset.tab==='t-over'){sizePad();draw();}
+});
+
+// --- блок X/Y, ползунки, хатка ---
+const cv=$('pad'),cx=cv.getContext('2d');
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function sizePad(){const r=devicePixelRatio||1,s=cv.clientWidth;if(!s)return;cv.width=cv.height=s*r;cx.setTransform(r,0,0,r,0,0);}
+function draw(){
+  const s=cv.clientWidth;if(!s)return;
+  const m=14,w=s-2*m,c=s/2;
+  cx.clearRect(0,0,s,s);
+  cx.strokeStyle=css('--line');cx.lineWidth=1;cx.strokeRect(m,m,w,w);
+  cx.beginPath();cx.moveTo(c,m);cx.lineTo(c,s-m);cx.moveTo(m,c);cx.lineTo(s-m,c);cx.stroke();
+  const d=(+$('dz').value)/65535*w;
+  if(d>0){cx.setLineDash([4,4]);cx.strokeRect(c-d,c-d,2*d,2*d);cx.setLineDash([]);}
+  const px=m+S.x/65535*w,py=m+S.y/65535*w;
+  cx.strokeStyle=css('--mute');cx.beginPath();cx.moveTo(c,c);cx.lineTo(px,py);cx.stroke();
+  cx.fillStyle=css('--bar');cx.strokeStyle=css('--ink');cx.lineWidth=2;
+  cx.beginPath();cx.arc(px,py,9,0,7);cx.fill();cx.stroke();
+}
+const HATS={hu:[1,2,8],hr:[2,3,4],hd:[4,5,6],hl:[6,7,8]};
+sizePad();draw();addEventListener('resize',()=>{sizePad();draw();});
+
+// --- обмен пакетами ---
+const le16=(d,i)=>d[i]|(d[i+1]<<8);
+function req(cmd,payload=[]){
+  const job=()=>new Promise((res,rej)=>{
+    const buf=new Uint8Array(64);buf[0]=cmd;buf.set(payload,1);
+    const t=setTimeout(()=>{waiter=null;rej(new Error('Устройство не ответило'))},1500);
+    waiter={type:cmd|0x80,res:d=>{clearTimeout(t);res(d)}};
+    dev.sendReport(0,buf).catch(e=>{clearTimeout(t);waiter=null;rej(e)});
+  });
+  chain=chain.then(job,job);return chain;
+}
+function onReport(e){
+  const d=new Uint8Array(e.data.buffer,e.data.byteOffset,e.data.byteLength);
+  if(d[0]===0x01)return telemetry(d);
+  if(waiter&&(d[0]===waiter.type||d[0]===0xFF)){const w=waiter;waiter=null;w.res(d);}
+}
+function telemetry(d){
+  const o=[0,1,2,3].map(a=>le16(d,13+a*2));
+  o.forEach((v,a)=>{$('f'+a).style.width=(v/655.35)+'%';$('o'+a).textContent=v;$('r'+a).textContent=le16(d,5+a*2);});
+  S.x=o[0];S.y=o[1];$('vz').style.height=(o[2]/655.35)+'%';$('vrz').style.height=(o[3]/655.35)+'%';
+  for(let i=0;i<8;i++)$('b'+i).classList.toggle('on',!!(d[3]>>i&1));
+  for(const k in HATS)$(k).classList.toggle('on',HATS[k].includes(d[4]));
+  draw();
+  const c=!!d[1];
+  $('cState').textContent=c?`Калибровка идёт: оси ${d[2]} из 4`:'';
+  if(c&&!calibPoll)calibPoll=setInterval(()=>refreshCalib().catch(()=>{}),300);
+  if(!c&&calibPoll){clearInterval(calibPoll);calibPoll=null;}
+  if(c!==wasCalib){wasCalib=c;$('cStart').disabled=c;$('cFinish').disabled=!c;refreshCalib().catch(()=>{});}
+}
+
+// --- данные устройства ---
+async function refreshCalib(){
+  const d=await req(0x02);
+  for(let i=0;i<4;i++){$('cmin'+i).textContent=le16(d,2+i*2);$('cmax'+i).textContent=le16(d,10+i*2);}
+  $('cc0').textContent=le16(d,18);$('cc1').textContent=le16(d,20);
+}
+const hex=(r,g,b)=>'#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+function labels(){
+  $('dzv').textContent=$('dz').value;$('lbv').textContent=$('lb').value+'%';$('lgv').textContent=$('lg').value+'%';
+  const h=$('lc').value,k=$('lb').value/100;
+  $('sw').style.background=`rgb(${[1,3,5].map(i=>Math.round(parseInt(h.substr(i,2),16)*k)).join(',')})`;
+  draw();
+}
+async function refreshSettings(){
+  const d=await req(0x05);
+  for(let i=0;i<4;i++)$('iv'+i).checked=!!(d[1]>>i&1);
+  $('dz').value=le16(d,2);$('lc').value=hex(d[4],d[5],d[6]);$('lb').value=d[7];$('lg').value=d[8];labels();
+}
+function note(text,cls=''){document.querySelectorAll('.smsg').forEach(e=>{e.textContent=text;e.className='msg smsg '+cls;});}
+async function applySettings(){
+  let mask=0;for(let i=0;i<4;i++)if($('iv'+i).checked)mask|=1<<i;
+  const dz=+$('dz').value,h=$('lc').value;
+  try{
+    const d=await req(0x06,[mask,dz&255,dz>>8,parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16),+$('lb').value,+$('lg').value]);
+    note(d[1]===0?'Применено. Не забудьте сохранить.':'Устройство отклонило значение.',d[1]===0?'':'bad');
+  }catch(e){note(e.message,'bad');}
+}
+const schedule=()=>{labels();clearTimeout(tmr);tmr=setTimeout(applySettings,100);};
+['dz','lc','lb','lg'].forEach(i=>$(i).oninput=schedule);
+for(let i=0;i<4;i++)$('iv'+i).onchange=schedule;
+document.querySelectorAll('.save').forEach(b=>b.onclick=async()=>{
+  try{await req(0x07);note('Настройки сохранены во флеш.','ok');}catch(e){note(e.message,'bad');}
+});
+
+// --- подключение ---
+const setEnabled=on=>document.querySelectorAll('.needs').forEach(e=>e.disabled=!on);
+async function attach(d){
+  dev=d;if(!dev.opened)await dev.open();
+  dev.oninputreport=onReport;
+  const info=await req(0x01);
+  $('status').textContent=`Подключено · прошивка ${info[2]}.${info[3]} · протокол ${info[1]}`;$('status').className='on';
+  $('connect').textContent='Переподключить';
+  setEnabled(true);$('cStart').disabled=!!info[5];$('cFinish').disabled=!info[5];
+  await req(0x08,[1]);await refreshCalib();await refreshSettings();
+}
+function detached(){
+  dev=null;waiter=null;wasCalib=false;
+  if(calibPoll){clearInterval(calibPoll);calibPoll=null;}
+  $('status').textContent='Не подключено';$('status').className='';$('connect').textContent='Подключить джойстик';
+  setEnabled(false);$('cFinish').disabled=true;
+}
+$('connect').onclick=async()=>{
+  try{const [d]=await navigator.hid.requestDevice({filters:[{usagePage:0xFF00,usage:0x01}]});if(d)await attach(d);}
+  catch(e){$('status').textContent='Ошибка подключения: '+e.message;}
+};
+if('hid' in navigator){
+  navigator.hid.addEventListener('disconnect',e=>{if(e.device===dev)detached();});
+  navigator.hid.getDevices().then(l=>{const d=l.find(x=>x.collections.some(c=>c.usagePage===0xFF00));if(d)attach(d).catch(()=>{});});
+}
+
+// --- калибровка и сервис ---
+$('cStart').onclick=async()=>{
+  try{await req(0x03);$('cMsg').className='msg';$('cMsg').textContent='Калибровка запущена. Двигайте все оси от края до края.';}
+  catch(e){$('cMsg').className='msg bad';$('cMsg').textContent=e.message;}
+};
+$('cFinish').onclick=async()=>{
+  const m=$('cMsg');
+  try{
+    const d=await req(0x04);
+    if(d[1]===0){m.className='msg ok';m.textContent='Калибровка сохранена.';}
+    else if(d[1]===1){m.className='msg bad';m.textContent='Калибровка не принята: у какой-то оси слишком малый ход или центр у края. Прокрутите оси полностью и повторите.';}
+    else{m.className='msg bad';m.textContent='Калибровка сейчас не запущена.';}
+    refreshCalib();
+  }catch(e){m.className='msg bad';m.textContent=e.message;}
+};
+$('boot').onclick=async()=>{
+  if(!confirm('Джойстик отключится и появится как диск RPI-RP2. Продолжить?'))return;
+  try{await req(0x0F);detached();}catch(e){}
+};
+</script>
+</body>
+</html>

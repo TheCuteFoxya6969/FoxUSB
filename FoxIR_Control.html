@@ -135,6 +135,14 @@ input[type=text]:focus{border-color:var(--ink)}
 #toast.bad{border-color:var(--bad);color:var(--bad)}#toast.ok{border-color:var(--ok)}
 
 @media (max-width:620px){.bind{grid-template-columns:1fr auto}.bind .code{grid-column:1/-1;border-right:0;border-bottom:3px solid var(--bar)}}
+.mc-row{display:grid;grid-template-columns:28px 130px 1fr 96px auto;gap:8px;align-items:center;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);margin-bottom:4px;font-size:14px}
+.mc-row.rec{border-color:var(--bad)}
+.mc-row input[type=number]{width:72px;font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px 6px}
+.mc-row select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px 4px;max-width:100%}
+.mc-row button{padding:2px 8px;font-size:13px}
+#mcList{max-height:300px;overflow:auto;margin:8px 0}
+.mc-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+@media (max-width:620px){.mc-row{grid-template-columns:24px 1fr 90px}}
 </style>
 </head>
 <body>
@@ -236,6 +244,7 @@ input[type=text]:focus{border-color:var(--ink)}
       <div class="opts" id="typeOpts">
         <div class="opt" role="button" tabindex="0" aria-pressed="true" data-type="0">Нажимать клавишу</div>
         <div class="opt" role="button" tabindex="0" aria-pressed="false" data-type="1">Управлять мышью</div>
+        <div class="opt" role="button" tabindex="0" aria-pressed="false" data-type="2">Макрос (запись действий)</div>
       </div>
 
       <div id="kbPane">
@@ -248,6 +257,19 @@ input[type=text]:focus{border-color:var(--ink)}
         <div class="selbar"><span>Выбрано:</span><b id="mSel">—</b></div>
         <div id="mouseWiz"></div>
         <div class="sl" id="stepRow" hidden><span>Скорость</span><input type="range" id="mStep" min="1" max="100" value="15"><span class="num" id="mStepV">15</span></div>
+      </div>
+      <div id="mcPane" hidden>
+        <div class="selbar"><span>Запуск:</span>
+          <select id="mcMode"><option value="0">один раз за нажатие</option><option value="1">повторять, пока кнопка удержана</option></select>
+          <span class="num" id="mcCnt" style="margin-left:auto"></span></div>
+        <div class="mc-tools">
+          <button id="mcRec" class="primary">● Записать с клавиатуры</button>
+          <button class="ghost" data-add="key">+ Клавиша</button><button class="ghost" data-add="click">+ Клик мыши</button>
+          <button class="ghost" data-add="move">+ Движение</button><button class="ghost" data-add="scroll">+ Прокрутка</button>
+          <button class="ghost" data-add="pause">+ Пауза</button><button class="danger" id="mcClear" style="margin-left:auto">Очистить</button>
+        </div>
+        <div id="mcList"></div>
+        <div class="hint" id="mcHint">Запись: нажимайте клавиши на обычной клавиатуре, паузы между ними запишутся сами. Esc или кнопка останавливают запись. «Пауза» в строке — время до следующего шага, мс.</div>
       </div>
       <div class="foot"><button id="b2" class="ghost">Назад</button><button id="n2" class="primary" disabled>Дальше</button></div>
     </div>
@@ -543,7 +565,7 @@ let kbW=null,mouseW=null;
 function setStep(n){
   ['s1','s2','s3'].forEach((id,i)=>$(id).hidden=(i+1)!==n);
   ['p1','p2','p3'].forEach((id,i)=>$(id).className=(i+1)<=n?'on':'');
-  $('modal').classList.toggle('wide',n===2&&wiz.type===0);
+  $('modal').classList.toggle('wide',n===2&&wiz.type!==1);
   if(n===3)setTimeout(()=>$('nameIn').focus(),50);
 }
 function openWiz(edit){
@@ -578,7 +600,7 @@ $('b2').onclick=()=>setStep(1);
 $('b3').onclick=()=>setStep(2);
 
 document.querySelectorAll('#typeOpts .opt').forEach(o=>{
-  const act=()=>{wiz.type=+o.dataset.type;syncWiz();$('modal').classList.toggle('wide',wiz.type===0)};
+  const act=()=>{wiz.type=+o.dataset.type;syncWiz();$('modal').classList.toggle('wide',wiz.type!==1)};
   o.onclick=act;o.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}};
 });
 function syncWiz(){
@@ -686,7 +708,7 @@ function testDown(code){
   if(b.type===0){
     Object.keys(kbT.mapM).forEach(m=>{if(b.mod&+m)lit(kbT.mapM[m])});
     if(b.key)lit(kbT.mapK[b.key]);
-  }else lit(mouseT[mouseId(b)]);
+  }else if(b.type===1)lit(mouseT[mouseId(b)]);
   const a=describe(b);
   $('testInfo').className='info on';
   $('testInfo').textContent=(b.name?b.name+' — ':'')+a.title;
@@ -888,6 +910,189 @@ $('gB').min=5;
 const dt=document.createElement('details');
 dt.innerHTML='<summary class="mute">Дополнительно</summary><p class="hint" style="margin:8px 0">Откроется режим прошивки (появится диск RPI-RP2). Чтобы вернуться, выньте и снова вставьте устройство.</p>';
 $('boot').before(dt);dt.appendChild($('boot'));
+})();
+</script>
+
+<script>
+(()=>{
+/* ================= Макросы ================= */
+let mmax=0,msteps=100,mcnt=[];
+const MODC={ControlLeft:0xE0,ShiftLeft:0xE1,AltLeft:0xE2,MetaLeft:0xE3,ControlRight:0xE4,ShiftRight:0xE5,AltRight:0xE6,MetaRight:0xE7};
+const MNAME=['Ctrl','Shift','Alt','Win','Ctrl (прав.)','Shift (прав.)','Alt (прав.)','Win (прав.)'];
+const BTN={1:'Левая',2:'Правая',4:'Средняя'};
+const keyName=a=>a>=0xE0&&a<=0xE7?MNAME[a-0xE0]:(KEYS[a]||'код 0x'+a.toString(16).toUpperCase());
+const KOPT=MNAME.map((n,i)=>`<option value="${0xE0+i}">${n}</option>`).join('')+
+  Object.keys(KEYS).map(Number).sort((a,b)=>a-b).map(c=>`<option value="${c}">${KEYS[c]}</option>`).join('');
+
+async function loadMInfo(){
+  try{const d=await rpc([0x10],0x10,1000);mmax=d[1];msteps=d[2];mcnt=[...d.slice(3,3+mmax)]}catch(e){mmax=0}
+}
+async function loadMacro(slot){
+  const n=mcnt[slot]||0,out=[];
+  for(let i=0;i<n;i+=6){
+    const d=await rpc([0x11,slot,i],0x11);
+    for(let j=0;j<d[3];j++){const o=4+8*j;
+      out.push({t:d[o],a:d[o+1],x:((d[o+2]<<8)|d[o+3])<<16>>16,y:((d[o+4]<<8)|d[o+5])<<16>>16,d:(d[o+6]<<8)|d[o+7]})}
+  }
+  return out;
+}
+async function writeMacro(){
+  const s=wiz.macro;
+  try{
+    for(let i=0;i<s.length;i+=6){
+      const c=s.slice(i,i+6),b=new Uint8Array(63);b[0]=0x12;b[1]=wiz.slot;b[2]=i;b[3]=c.length;
+      c.forEach((t,j)=>b.set([t.t,t.a,(t.x>>8)&255,t.x&255,(t.y>>8)&255,t.y&255,(t.d>>8)&255,t.d&255],4+8*j));
+      if((await rpc(b,0x12))[4]!==1)throw new Error('Макрос не записан');
+    }
+    if((await rpc([0x13,wiz.slot,s.length],0x13))[4]!==1)throw new Error('Макрос не записан');
+    mcnt[wiz.slot]=s.length;return true;
+  }catch(e){toast(e.message,'bad');return false}
+}
+
+// загрузка списка: сначала сведения о макросах
+const _lb=loadBindings;
+loadBindings=async function(){await loadMInfo();await _lb()};
+
+// описание в списке
+const _ds=describe;
+describe=function(b){
+  if(b.type!==2)return _ds(b);
+  return {title:'Макрос (шагов: '+(mcnt[b.key]||0)+')',sub:'Макрос · '+(b.mact===1?'повтор при удержании':'один раз')};
+};
+
+/* --- редактор --- */
+const STEPDEF={key:[{t:0,a:0x04,d:50},{t:1,a:0x04,d:50}],click:[{t:2,a:1,d:50},{t:3,a:1,d:50}],move:[{t:4,x:50,y:0,d:50}],scroll:[{t:5,y:1,d:50}],pause:[{t:6,d:500}]};
+const full=s=>({t:0,a:0,x:0,y:0,d:0,...s});
+function stepText(t){return ['Клавиша ↓','Клавиша ↑','Мышь ↓','Мышь ↑','Движение','Прокрутка','Пауза'][t]}
+function renderMacro(){
+  const L=$('mcList');L.innerHTML='';
+  const M=wiz.macro;
+  $('mcCnt').textContent='шагов: '+M.length+' из '+msteps;
+  $('mcMode').value=wiz.mmode;
+  $('mcRec').textContent=rec2?'■ Остановить запись':'● Записать с клавиатуры';
+  $('mcRec').className=rec2?'danger':'primary';
+  M.forEach((t,i)=>{
+    const r=document.createElement('div');r.className='mc-row'+(rec2&&i===M.length-1?' rec':'');
+    let par='';
+    if(t.t<2)par=`<select data-p="a">${KOPT}</select>`;
+    else if(t.t<4)par=`<select data-p="a">${Object.entries(BTN).map(([v,n])=>`<option value="${v}">${n} кнопка</option>`).join('')}</select>`;
+    else if(t.t===4)par=`ΔX <input type="number" data-p="x" min="-3000" max="3000"> ΔY <input type="number" data-p="y" min="-3000" max="3000"> <span class="mute">пикс.</span>`;
+    else if(t.t===5)par=`<input type="number" data-p="y" min="-100" max="100"> <span class="mute">+ вверх, − вниз</span>`;
+    r.innerHTML=`<span class="num">${i+1}</span><b>${stepText(t.t)}</b><span>${par}</span>
+      <span><input type="number" data-p="d" min="0" max="65535" title="Пауза после шага, мс"> мс</span>
+      <span class="btns"><button data-m="-1" title="Выше">↑</button> <button data-m="1" title="Ниже">↓</button> <button class="danger" data-m="x">✕</button></span>`;
+    r.querySelectorAll('[data-p]').forEach(e=>{
+      e.value=t[e.dataset.p];
+      e.oninput=()=>{let v=+e.value;if(e.dataset.p==='a'&&t.t>=2&&t.t<4)v=+e.value;t[e.dataset.p]=v;if(e.tagName!=='SELECT')t[e.dataset.p]=Math.max(+e.min,Math.min(+e.max,v||0))};
+    });
+    r.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{
+      const m=b.dataset.m;
+      if(m==='x')M.splice(i,1);
+      else{const j=i+ +m;if(j<0||j>=M.length)return;[M[i],M[j]]=[M[j],M[i]]}
+      renderMacro();syncWiz();
+    });
+    L.appendChild(r);
+  });
+  if(rec2)L.scrollTop=L.scrollHeight;
+}
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{
+  const add=STEPDEF[b.dataset.add].map(full);
+  if(wiz.macro.length+add.length>msteps){toast('Достигнут предел шагов макроса','bad');return}
+  wiz.macro.push(...add);renderMacro();syncWiz();
+});
+$('mcClear').onclick=()=>{if(wiz.macro.length&&!confirm('Удалить все шаги макроса?'))return;stopRec();wiz.macro=[];renderMacro();syncWiz()};
+$('mcMode').onchange=()=>{wiz.mmode=+$('mcMode').value};
+
+/* --- запись с клавиатуры (только по кнопке) --- */
+let rec2=false,recLast=0,held=new Set();
+function stopRec(){
+  if(!rec2)return;
+  rec2=false;
+  held.forEach(h=>pushRec(1,h));held.clear();   // отпустить то, что осталось зажатым
+  if(wiz.macro.length)wiz.macro[wiz.macro.length-1].d=0;
+  renderMacro();syncWiz();
+}
+function pushRec(t,a){
+  const now=performance.now(),M=wiz.macro;
+  if(M.length&&recLast)M[M.length-1].d=Math.min(65535,Math.round(now-recLast));
+  recLast=now;
+  if(M.length>=msteps){toast('Достигнут предел шагов макроса','bad');rec2=false;return}
+  M.push(full({t,a,d:0}));
+}
+$('mcRec').onclick=()=>{
+  if(rec2){stopRec();return}
+  rec2=true;recLast=0;held.clear();
+  if(wiz.macro.length)wiz.macro[wiz.macro.length-1].d=Math.max(wiz.macro[wiz.macro.length-1].d,100);
+  renderMacro();$('mcRec').blur();
+};
+const hidOf=e=>MODC[e.code]||CODE2HID[e.code]||0;
+['keydown','keyup'].forEach(ev=>addEventListener(ev,e=>{
+  if(!rec2||!wizOpen()||wiz.type!==2)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  if(ev==='keydown'){
+    if(e.code==='Escape'){stopRec();return}
+    if(e.repeat)return;
+    const h=hidOf(e);if(!h)return;
+    held.add(h);pushRec(0,h);
+  }else{
+    const h=hidOf(e);if(!h||!held.has(h))return;
+    held.delete(h);pushRec(1,h);
+  }
+  if(!rec2)return stopRec();
+  renderMacro();syncWiz();
+},true));
+
+/* --- встраивание в мастер --- */
+const _sw=syncWiz;
+syncWiz=function(){
+  _sw();
+  const on=wiz.type===2;
+  $('mcPane').hidden=!on;
+  if(!on){if(rec2)stopRec();return}
+  if(!wiz.macro)wiz.macro=[];
+  $('n2').disabled=!wiz.macro.length||wiz.slot<0;
+  $('mcCnt').textContent='шагов: '+wiz.macro.length+' из '+msteps;
+};
+const _swSet=setStep;
+setStep=function(n){if(n!==2&&rec2)stopRec();_swSet(n);if(n===2&&wiz.type===2)renderMacro()};
+document.querySelectorAll('#typeOpts .opt').forEach(o=>o.addEventListener('click',()=>{if(+o.dataset.type===2)renderMacro()}));
+
+const _ow2=openWiz;
+openWiz=function(e){
+  _ow2(e);rec2=false;
+  document.querySelector('#typeOpts [data-type="2"]').hidden=!mmax;
+  wiz.macro=[];wiz.mmode=0;
+  if(e&&e.type===2){
+    wiz.slot=e.key;wiz.mmode=e.mact===1?1:0;
+    loadMacro(e.key).then(m=>{wiz.macro=m;renderMacro();syncWiz()}).catch(x=>toast(x.message,'bad'));
+  }else{
+    const used=new Set(bindings.filter(b=>b.type===2).map(b=>b.key));
+    let f=-1;for(let i=0;i<mmax;i++)if(!used.has(i)){f=i;break}
+    wiz.slot=f;
+  }
+  syncWiz();
+};
+const _cw=closeWiz;
+closeWiz=function(){stopRec();_cw();if(dev)loadMInfo().then(renderList)};
+$('wiz').querySelectorAll('[data-close]').forEach(b=>b.onclick=closeWiz);
+
+const _bp=buildPayload;
+buildPayload=function(){
+  if(wiz.type!==2)return _bp();
+  const b=new Uint8Array(63),c=wiz.ir;b[0]=0x02;
+  b[1]=(c>>>24)&255;b[2]=(c>>>16)&255;b[3]=(c>>>8)&255;b[4]=c&255;
+  b[5]=2;b[6]=wiz.slot;b[8]=wiz.mmode;b.set(nameBytes(),13);return b;
+};
+// сводка на 3 шаге: временно показываем актуальное число шагов
+const _n2=$('n2').onclick;
+$('n2').onclick=()=>{if(wiz.type===2){stopRec();const old=mcnt[wiz.slot];mcnt[wiz.slot]=wiz.macro.length;_n2();mcnt[wiz.slot]=old}else _n2()};
+const _ab=applyBinding;
+applyBinding=async function(){
+  if(wiz.type===2){stopRec();if(wiz.slot<0){toast('Нет свободных макросов','bad');return false}if(!(await writeMacro()))return false}
+  return _ab();
+};
+$('save').onclick=async()=>{if(await applyBinding()){toast('Кнопка применена','ok');closeWiz()}};
+$('saveMore').onclick=async()=>{if(await applyBinding()){toast('Кнопка применена','ok');openWiz()}};
 })();
 </script>
 </body>
